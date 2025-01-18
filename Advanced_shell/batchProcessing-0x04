@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Define the API endpoint
+API_URL="https://pokeapi.co/api/v2/pokemon"
+
+# Define the list of Pokémon
+POKEMON_LIST=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+
+# Define the error file
+ERROR_FILE="errors.txt"
+
+# Function to fetch Pokémon data
+download_pokemon_data() {
+  POKEMON=$1
+  OUTPUT_FILE="${POKEMON}.json"
+
+  # Retry mechanism
+  RETRIES=3
+  SUCCESS=false
+
+  for ((i=1; i<=RETRIES; i++)); do
+    # Make the API request
+    response=$(curl -s -w "%{http_code}" -o "$OUTPUT_FILE" "$API_URL/$POKEMON")
+    http_status=$(tail -n 1 <<< "$response")
+
+    # Check the HTTP status code
+    if [ "$http_status" -eq 200 ]; then
+      SUCCESS=true
+      break
+    else
+      echo "Attempt $i: Failed to fetch data for $POKEMON. HTTP status: $http_status" >> "$ERROR_FILE"
+      sleep 2  # Wait before retrying
+    fi
+  done
+
+  if [ "$SUCCESS" = false ]; then
+    echo "Error: All attempts failed for $POKEMON. Skipping..." >> "$ERROR_FILE"
+    rm -f "$OUTPUT_FILE"  # Remove partial output file if all retries fail
+  else
+    # Remove the status code appended to the output file
+    truncate -s -3 "$OUTPUT_FILE"
+    echo "Data for $POKEMON successfully saved to $OUTPUT_FILE."
+  fi
+}
+
+# Export the function for parallel processing
+export -f download_pokemon_data
+export API_URL
+export ERROR_FILE
+
+# Use parallel to fetch Pokémon data in parallel
+echo "Starting parallel data retrieval..."
+parallel -j 5 download_pokemon_data ::: "${POKEMON_LIST[@]}"
+
+# Wait for all background processes to complete
+wait
+
+echo "All Pokémon data retrieval completed."
+
+# Generate a CSV report
+REPORT_FILE="pokemon_report.csv"
+echo "Name,Height (m),Weight (kg)" > "$REPORT_FILE"
+
+# Process each JSON file
+for POKEMON in "${POKEMON_LIST[@]}"; do
+  OUTPUT_FILE="${POKEMON}.json"
+  if [ -f "$OUTPUT_FILE" ]; then
+    NAME=$(jq -r '.name' "$OUTPUT_FILE")
+    HEIGHT=$(jq -r '.height' "$OUTPUT_FILE" | awk '{print $1 / 10}')
+    WEIGHT=$(jq -r '.weight' "$OUTPUT_FILE" | awk '{print $1 / 10}')
+    echo "$NAME,$HEIGHT,$WEIGHT" >> "$REPORT_FILE"
+  fi
+
+done
+
+# Calculate averages using awk
+awk -F, 'NR > 1 { height += $2; weight += $3; count++ } END { print "Average Height (m):", height / count; print "Average Weight (kg):", weight / count }' "$REPORT_FILE"
