@@ -16,7 +16,7 @@ for POKEMON in "${POKEMON_LIST[@]}"; do
 
   # Make the API request and handle errors
   response=$(curl -s -w "%{http_code}" -o "$OUTPUT_FILE" "$API_URL/$POKEMON")
-  http_status=$(tail -n 1 <<< "$response")
+  http_status=$(echo "$response" | tail -c 3)
 
   # Check the HTTP status code
   if [ "$http_status" -ne 200 ]; then
@@ -50,8 +50,15 @@ for POKEMON in "${POKEMON_LIST[@]}"; do
     WEIGHT=$(jq -r '.weight' "$OUTPUT_FILE" | awk '{print $1 / 10}')
     echo "$NAME,$HEIGHT,$WEIGHT" >> "$REPORT_FILE"
   fi
-
 done
 
 # Calculate averages using awk
-awk -F, 'NR > 1 { height += $2; weight += $3; count++ } END { print "Average Height (m):", height / count; print "Average Weight (kg):", weight / count }' "$REPORT_FILE"
+AVERAGES=$(awk -F, 'NR > 1 { height += $2; weight += $3; count++ } END { print height / count, weight / count }' "$REPORT_FILE")
+AVG_HEIGHT=$(echo "$AVERAGES" | awk '{print $1}')
+AVG_WEIGHT=$(echo "$AVERAGES" | awk '{print $2}')
+
+# Format the output using sed
+FORMATTED_OUTPUT=$(echo "Average Height: ${AVG_HEIGHT}m, Average Weight: ${AVG_WEIGHT}kg." | sed 's/^./\U&/')
+
+# Print the formatted output
+echo "$FORMATTED_OUTPUT"
