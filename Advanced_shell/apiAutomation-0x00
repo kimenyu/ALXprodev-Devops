@@ -10,17 +10,19 @@ ERROR_FILE="errors.txt"
 
 # Make the API request and handle errors
 response=$(curl -s -w "%{http_code}" -o "$OUTPUT_FILE" "$API_URL/$POKEMON")
-http_status=$(tail -n 1 <<< "$response")
+http_status=$(echo "$response" | tail -c 3)
 
 # Check the HTTP status code
 if [ "$http_status" -ne 200 ]; then
   echo "Error: Failed to fetch data for $POKEMON. HTTP status: $http_status" >> "$ERROR_FILE"
-  echo "Response body: $(cat $OUTPUT_FILE)" >> "$ERROR_FILE"
-  rm -f "$OUTPUT_FILE"  # Remove partial output file if request fails
+  if [ -f "$OUTPUT_FILE" ]; then
+    echo "Response body: $(cat $OUTPUT_FILE)" >> "$ERROR_FILE"
+    rm -f "$OUTPUT_FILE"  # Remove partial output file if request fails
+  fi
   exit 1
 fi
 
-# Remove the status code appended to the output file
+# Remove the appended HTTP status code from the response file
 truncate -s -3 "$OUTPUT_FILE"
 
 # Success message
