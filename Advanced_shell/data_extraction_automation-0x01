@@ -35,11 +35,12 @@ type=$(jq -r '.types[0].type.name' "$OUTPUT_FILE")
 formatted_height=$(printf "%.1f" "$height")
 formatted_weight=$(printf "%.1f" "$weight")
 
-# Format the output
-OUTPUT_STRING="$name is of type $type, weighs ${formatted_weight}kg, and is ${formatted_height}m tall."
+# Format the output using sed for capitalization
+output_string="$name is of type $type, weighs ${formatted_weight}kg, and is ${formatted_height}m tall."
+output_string=$(echo "$output_string" | sed 's/^./\U&/')
 
 # Print the result
-echo "$OUTPUT_STRING"
+echo "$output_string"
 
 # Success message
 echo "Data for $POKEMON successfully saved to $OUTPUT_FILE."
