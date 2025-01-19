@@ -43,17 +43,22 @@ download_pokemon_data() {
   fi
 }
 
-# Export the function for parallel processing
-export -f download_pokemon_data
-export API_URL
-export ERROR_FILE
+# Fetch data for Pokémon in parallel using background processes
+for POKEMON in "${POKEMON_LIST[@]}"; do
+  download_pokemon_data "$POKEMON" &  # Run the function in the background
+done
 
-# Use parallel to fetch Pokémon data in parallel
-echo "Starting parallel data retrieval..."
-parallel -j 5 download_pokemon_data ::: "${POKEMON_LIST[@]}"
+# Monitor background processes
+echo "Waiting for all background processes to complete..."
+while jobs -r | grep -q .; do
+  sleep 1  # Wait for active jobs to complete
+done
 
-# Wait for all background processes to complete
-wait
+# Kill lingering background processes (if any)
+if jobs -r | grep -q .; then
+  echo "Killing lingering processes..."
+  jobs -p | xargs kill
+fi
 
 echo "All Pokémon data retrieval completed."
 
@@ -70,7 +75,6 @@ for POKEMON in "${POKEMON_LIST[@]}"; do
     WEIGHT=$(jq -r '.weight' "$OUTPUT_FILE" | awk '{print $1 / 10}')
     echo "$NAME,$HEIGHT,$WEIGHT" >> "$REPORT_FILE"
   fi
-
 done
 
 # Calculate averages using awk
